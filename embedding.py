@@ -4,41 +4,42 @@ import numpy as np
 import os
 import tkinter as tk
 from tkinter import simpledialog
+from deepface import DeepFace
+import tensorflow as tf
 
 
 
 mp_face=mp.solutions.face_detection
-def extract_embedding(img_path):
+
+face_detection = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5)
+def extract_embedding(img):
   #img = cv2.imread(img_path)
-  #img_rgb = rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-  cap = cv2.VideoCapture(0)
+  img_rgb = rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-  with mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5) as face_detection:
-    
-    while True:
-      ret,frame=cap.read()
-      if not ret:
-         break
-      
-      img_rgb=cv2.cvtColor
+  results = face_detection.process(img_rgb)
       
     
-    #results = face_detection.process(img_rgb)
-    #if results.detection:
-      #bbox = results.detections[0].location_data.relative_bounding_box
+  if results.detections:
+    print("Tipo da variável results:", type(results))
+    print("Conteúdo de results:", results)
+    bbox = results.detections[0].location_data.relative_bounding_box
 
-      h,w,_ = img_rgb.shape
-      x1 = int(bbox.xmin * w)
-      y1 = int(bbox.ymin * h)
-      x2 = int((bbox.xmin + bbox.width) * w)
-      y2 = int((bbox.ymin + bbox.height) * h)
+    h,w,_ = img_rgb.shape
+    x1 = int(bbox.xmin * w)
+    y1 = int(bbox.ymin * h)
+    x2 = int((bbox.xmin + bbox.width) * w)
+    y2 = int((bbox.ymin + bbox.height) * h)
 
-      face = img_rgb[y1:y2, x1:x2]
-      face = cv2.resize(face, (160,160))
+    face = img_rgb[y1:y2, x1:x2]
+    if face.size == 0:
+      return None
 
-      embedding = embedder.embeddings([face])[0]
-      return embedding
-    return None
+    face = cv2.resize(face, (160,160))
+
+    embedding = DeepFace.represent(img_path = face, model_name = "Facenet")[0]["embedding"]
+
+    return embedding
+
 
 
 def load_dataset():
@@ -57,7 +58,17 @@ def load_dataset():
                 embeddings.append(emb)
                 labels.append(person)
 def save_embedding(X,Y,cache_file="faces_embeddings.npz"):
-   np.savez(cache_file,X=X,Y=Y)
+  if os.path.exists("faces_embeddings.npz"):
+    np.savez(cache_file,X=X,Y=Y)
+
+  else:
+    try:
+        # Tenta criar um novo arquivo 'novo_arquivo.txt'
+        with open('faces_embeddings.npz', 'x') as arquivo:
+            arquivo.write('Conteúdo do novo arquivo.')
+        print("Arquivo 'faces_embeddings.npz' criado com sucesso.")
+    except FileExistsError:
+        print("O arquivo 'novo_arquivo.txt' já existe.")
 
 def load_embeddings(cache_file="faces_embeddings.npz"):
   
@@ -109,6 +120,15 @@ def Add_new():
     if img is None:
        print("nenhuma imagem capturada")
        return
+    
+    '''img = cv2.imread(img_path)
+    img_rgb = rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    with mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5) as face_detection:
+      results = face_detection.process(img_rgb)'''
+
+
+
     emb = extract_embedding(img)
     if emb is not None:
 
@@ -126,6 +146,8 @@ def Add_new():
 
     else:
       print("Erro ao gerar embedding. Nenhum rosto detectado.")
+
+
 
 
     
