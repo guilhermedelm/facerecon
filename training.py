@@ -1,11 +1,6 @@
-import numpy as np
-import embedding
+from sklearn.neighbors import KNeighborsClassifier
 
-def Add_new(person_name,new_image):
-    global X,Y
-
-    for img_path in new_image:
-        emb = embedding.extract_embedding(img_path)
-        if emb is not None:
-            X = np.vstack([X,emb])
-            Y = np.append(Y,person_name)
+def train_knn(X, y):
+    knn = KNeighborsClassifier(n_neighbors=3)
+    knn.fit(X, y)
+    return knn
