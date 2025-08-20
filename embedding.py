@@ -6,15 +6,17 @@ import tkinter as tk
 from tkinter import simpledialog
 from deepface import DeepFace
 import tensorflow as tf
+import training as tr
 
 
-
+X=[]
+Y=[]
 mp_face=mp.solutions.face_detection
 
 face_detection = mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5)
 def extract_embedding(img):
   #img = cv2.imread(img_path)
-  img_rgb = rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+  img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
   results = face_detection.process(img_rgb)
       
@@ -36,7 +38,10 @@ def extract_embedding(img):
 
     face = cv2.resize(face, (160,160))
 
-    embedding = DeepFace.represent(img_path = face, model_name = "Facenet")[0]["embedding"]
+    print(face.shape)
+
+    embedding = DeepFace.represent(img_path=face,model_name="Facenet",enforce_detection=False)[0]["embedding"]
+    #embedding = DeepFace.represent(img_path = face, model_name = "Facenet")[0]["embedding"]
 
     return embedding
 
@@ -57,24 +62,15 @@ def load_dataset():
             if emb is not None:
                 embeddings.append(emb)
                 labels.append(person)
-def save_embedding(X,Y,cache_file="faces_embeddings.npz"):
-  if os.path.exists("faces_embeddings.npz"):
-    np.savez(cache_file,X=X,Y=Y)
-
-  else:
-    try:
-        # Tenta criar um novo arquivo 'novo_arquivo.txt'
-        with open('faces_embeddings.npz', 'x') as arquivo:
-            arquivo.write('Conteúdo do novo arquivo.')
-        print("Arquivo 'faces_embeddings.npz' criado com sucesso.")
-    except FileExistsError:
-        print("O arquivo 'novo_arquivo.txt' já existe.")
+def save_embedding(X, Y, cache_file="faces_embeddings.npz"):
+  np.savez(cache_file, X=X, Y=Y)
+  print(f"Arquivo salvo com sucesso: {X.shape}, {Y.shape}")
 
 def load_embeddings(cache_file="faces_embeddings.npz"):
   
   if os.path.exists(cache_file):
     data = np.load(cache_file, allow_pickle=True)
-    return data["X"], data["y"]
+    return data["X"], data["Y"]
   return [], []
 
 
@@ -121,14 +117,6 @@ def Add_new():
        print("nenhuma imagem capturada")
        return
     
-    '''img = cv2.imread(img_path)
-    img_rgb = rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    with mp_face.FaceDetection(model_selection=1, min_detection_confidence=0.5) as face_detection:
-      results = face_detection.process(img_rgb)'''
-
-
-
     emb = extract_embedding(img)
     if emb is not None:
 
@@ -142,7 +130,8 @@ def Add_new():
         Y = np.append(Y,person_name)
       save_embedding(X,Y)
       print(f"Pessoa {person_name} adicionada com sucesso!")
-
+      print(X)
+      print(Y)
 
     else:
       print("Erro ao gerar embedding. Nenhum rosto detectado.")
@@ -150,6 +139,45 @@ def Add_new():
 
 
 
+'''Funções principais'''
+
+
+def run():
+  global X,Y
+
+  X,Y = load_embeddings()
+
+  if len(X) == 0:
+    print("Nenhuma foto registrada, rodar add_new()")
+    print(X)
+    return
+  knn =tr.train_knn(X,Y)
+
+  video =cv2.VideoCapture(0)
+  while True:
+    ret,frame = video.read()
+    if not ret:
+      print("erro ao capturar frame do vídeo")
+      break
+
+      
+
+    emb = extract_embedding(frame)
+
+    if emb is not None:
+      # reshape porque o sklearn espera matriz (1, n_features)
+      pred = knn.predict([emb])[0]
+      cv2.putText(frame, pred, (50,50), cv2.FONT_HERSHEY_SIMPLEX,1, (0,255,0), 2, cv2.LINE_AA)
+    else:
+      cv2.putText(frame, "Desconhecido", (50,50), cv2.FONT_HERSHEY_SIMPLEX,1, (0,0,255), 2, cv2.LINE_AA)
+
+      cv2.imshow("Reconhecimento Facial - tempo real", frame)
+
+      key = cv2.waitKey(1) & 0xFF
+      if key == 27:  # ESC -> sair
+        break
+  video.release()
+  cv2.destroyAllWindows()
     
 
 
